@@ -41,23 +41,27 @@ namespace paddle {
 namespace lite {
 
 void CxxPaddleApiImpl::Init(const lite_api::CxxConfig &config) {
+  LOG(INFO) << "cxx paddle api impl init";
   config_ = config;
   mode_ = config.power_mode();
   threads_ = config.threads();
+
+  LOG(INFO) << "cxx paddle api impl set target config";
   raw_predictor_->SetTargetConfigs(config.target_configs());
-#ifdef LITE_WITH_XPU
-  CHECK(config.target_configs().at(TARGET(kXPU)).get()) << "no xpu config set";
-  class LoadPredictorConfig load_xpu_config_guard(
-      reinterpret_cast<paddle::lite::XPURunTimeOption *>(
-          config.target_configs().at(TARGET(kXPU)).get()));
-#endif
-#ifdef LITE_USE_THREAD_POOL
-  int thread_num = ThreadPool::Init(threads_);
-  if (thread_num > 1) {
-    ThreadPool::AcquireThreadPool();
-  }
-#endif
-  if (!status_is_cloned_) {
+// #ifdef LITE_WITH_XPU
+//   CHECK(config.target_configs().at(TARGET(kXPU)).get()) << "no xpu config set";
+//   class LoadPredictorConfig load_xpu_config_guard(
+//       reinterpret_cast<paddle::lite::XPURunTimeOption *>(
+//           config.target_configs().at(TARGET(kXPU)).get()));
+// #endif
+// #ifdef LITE_USE_THREAD_POOL
+//   int thread_num = ThreadPool::Init(threads_);
+//   if (thread_num > 1) {
+//     ThreadPool::AcquireThreadPool();
+//   }
+// #endif
+    LOG(INFO) << "clone status: " << status_is_cloned_;
+  if (!status_is_cloned_) { /// 判断该实例是否是拷贝过来的实例
     auto places = config.valid_places();
     std::vector<std::string> passes = config.get_passes_internal();
 
@@ -92,34 +96,34 @@ void CxxPaddleApiImpl::Init(const lite_api::CxxConfig &config) {
         raw_predictor_->scope(), config.nnadapter_dynamic_shape_info());
 #endif
 
-    auto use_layout_preprocess_pass =
-        config.model_dir().find("OPENCL_PRE_PRECESS");
-    VLOG(1) << "use_layout_preprocess_pass:" << use_layout_preprocess_pass;
-    if (places[0].target == TARGET(kOpenCL) &&
-        use_layout_preprocess_pass != std::string::npos) {
-      passes.push_back("type_layout_cast_preprocess_pass");
-      VLOG(1) << "add pass:" << passes[0];
-    }
+    // auto use_layout_preprocess_pass =
+    //     config.model_dir().find("OPENCL_PRE_PRECESS");
+    // VLOG(1) << "use_layout_preprocess_pass:" << use_layout_preprocess_pass;
+    // if (places[0].target == TARGET(kOpenCL) &&
+    //     use_layout_preprocess_pass != std::string::npos) {
+    //   passes.push_back("type_layout_cast_preprocess_pass");
+    //   VLOG(1) << "add pass:" << passes[0];
+    // }
 
-    if (config.quant_model()) {
-      passes.push_back("post_quant_dynamic_pass");
-      auto *pass = mir::PassManager::Global().LookUp<mir::PostQuantDynamicPass>(
-          "post_quant_dynamic_pass");
-      CHECK(pass);
-      pass->SetQuantType(config.quant_type());
-    }
+    // if (config.quant_model()) {
+    //   passes.push_back("post_quant_dynamic_pass");
+    //   auto *pass = mir::PassManager::Global().LookUp<mir::PostQuantDynamicPass>(
+    //       "post_quant_dynamic_pass");
+    //   CHECK(pass);
+    //   pass->SetQuantType(config.quant_type());
+    // }
 
-    auto *sparse_detect_pass =
-        mir::PassManager::Global().LookUp<mir::SparseConvDetectPass>(
-            "sparse_conv_detect_pass");
-    CHECK(sparse_detect_pass);
-    if (config.sparse_model()) {
-      sparse_detect_pass->SetSparseThreshold(config.sparse_threshold());
-    } else {
-      // Pass in a value greater than 1.0 to turn off the sparse pass
-      // internally.
-      sparse_detect_pass->SetSparseThreshold(1.5);
-    }
+    // auto *sparse_detect_pass =
+    //     mir::PassManager::Global().LookUp<mir::SparseConvDetectPass>(
+    //         "sparse_conv_detect_pass");
+    // CHECK(sparse_detect_pass);
+    // if (config.sparse_model()) {
+    //   sparse_detect_pass->SetSparseThreshold(config.sparse_threshold());
+    // } else {
+    //   // Pass in a value greater than 1.0 to turn off the sparse pass
+    //   // internally.
+    //   sparse_detect_pass->SetSparseThreshold(1.5);
+    // }
 
     raw_predictor_->Build(config, places, passes);
   } else {
@@ -296,11 +300,15 @@ namespace lite_api {
 template <>
 std::shared_ptr<PaddlePredictor> CreatePaddlePredictor(
     const CxxConfig &config) {
-  static std::mutex mutex_conf;
-  std::unique_lock<std::mutex> lck(mutex_conf);
-  auto x = std::make_shared<lite::CxxPaddleApiImpl>();
-  x->Init(config);
-  return x;
+    LOG(INFO) << "cxx api create the paddle predictor";
+    
+    static std::mutex mutex_conf;
+    std::unique_lock<std::mutex> lck(mutex_conf);
+    auto x = std::make_shared<lite::CxxPaddleApiImpl>();
+    
+    LOG(INFO) << "start to init the config";
+    x->Init(config);
+    return x;
 }
 
 }  // namespace lite_api

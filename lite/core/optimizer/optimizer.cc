@@ -265,6 +265,7 @@ std::unique_ptr<RuntimeProgram> RunDefaultOptimizer(
       }};
 
   // skip the discarded pass
+  LOG(INFO) << "discard some pass";
   const std::vector<std::string> discarded_passes =
       config.get_discarded_passes();
   for (auto& pass : discarded_passes) {
@@ -281,10 +282,14 @@ std::unique_ptr<RuntimeProgram> RunDefaultOptimizer(
   // It's just a workaround to avoid repeated op fusion if the filter weights
   // are shared among sub-blocks
   if (program.block_size() > 1) {
+    LOG(INFO) << "filter the lite_conv_bn_fuse_pass before size: " << passes_local.size(); 
     passes_local.erase(
         std::remove(
             passes_local.begin(), passes_local.end(), "lite_conv_bn_fuse_pass"),
         passes_local.end());
+    LOG(INFO) << "filter the lite_conv_bn_fuse_pass after size: " << passes_local.size(); 
+
+    
     // duplicated nodes can't be removed if referenced in different subgraphs
     passes_local.erase(std::remove(passes_local.begin(),
                                    passes_local.end(),

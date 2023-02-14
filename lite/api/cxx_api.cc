@@ -386,8 +386,11 @@ void Predictor::Build(const std::string &model_path,
                       lite_api::LiteModelType model_type,
                       const lite_api::CxxConfig &config,
                       const lite_api::CxxModelBuffer &model_buffer) {
+  LOG(INFO) << "model type: " << int(model_type);
   switch (model_type) {
     case lite_api::LiteModelType::kProtobuf: {
+      /// 默认情况下是非 combined 模型
+      /// 如果传入了模型文件和参数文件，表示非combined模型
       bool combined_param = false;
       if (!model_buffer.is_empty() ||
           (!model_file.empty() && !param_file.empty())) {
@@ -409,6 +412,9 @@ void Predictor::Build(const std::string &model_path,
     default:
       LOG(FATAL) << "Unknown model type";
   }
+
+  /// 进行执行图优化
+  LOG(INFO) << "start to optimize the model pass";
   Build(program_desc_, valid_places, passes, config);
 }
 
@@ -416,15 +422,20 @@ void Predictor::Build(const std::shared_ptr<cpp::ProgramDesc> &program_desc,
                       const std::vector<Place> &valid_places,
                       const std::vector<std::string> &passes,
                       const lite_api::CxxConfig &config) {
+  
+  /// 进行执行图优化
   program_desc_ = program_desc;
+
+  /// 设置每个变量 var 执行的设备
   // `inner_places` is used to optimize passes
   std::vector<Place> inner_places = valid_places;
   for (auto &valid_place : valid_places) {
-    if (valid_place.target == TARGET(kOpenCL)) continue;
+    if (valid_place.target == TARGET(kOpenCL)) { continue; }
     inner_places.emplace_back(
         Place(TARGET(kHost), valid_place.precision, valid_place.layout));
   }
 
+  /// 是否是量化的模式？？
   if (IsQuantizedMode(program_desc_)) {
     for (auto &valid_place : valid_places) {
       if (valid_place.target == TARGET(kARM)) {
@@ -446,9 +457,12 @@ void Predictor::Build(const std::shared_ptr<cpp::ProgramDesc> &program_desc,
       }
     }
   }
+
+  LOG(INFO) << "start to create the program";
   Program program(program_desc_, scope_, inner_places);
   valid_places_ = inner_places;
-
+  LOG(INFO) << "create the program finished";
+  
   core::KernelPickFactor factor;
   factor.ConsiderTarget();
   factor.ConsiderPrecision();
@@ -456,6 +470,8 @@ void Predictor::Build(const std::shared_ptr<cpp::ProgramDesc> &program_desc,
 
   exec_scope_ = program.exec_scope();
 
+  /// 执行默认的优化
+  LOG(INFO) << "run default optimizer";
   program_ = RunDefaultOptimizer(
       std::move(program), inner_places, factor, passes, config);
 

@@ -198,7 +198,7 @@ message VarDesc {
     repeated int32 ints = 5;
   };
 
-  required string name = 1;
+  required string name = 1; // 属性的名称
   required VarType type = 2;
   optional bool persistable = 3 [ default = false ];
   // True if the variable is an input data and

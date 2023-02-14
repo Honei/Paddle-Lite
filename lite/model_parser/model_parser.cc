@@ -38,6 +38,7 @@
 #include "lite/model_parser/ssa/program_desc.h"
 #endif
 #include "lite/utils/io.h"
+#include "google/protobuf/util/json_util.h"
 namespace paddle {
 namespace lite {
 #ifndef LITE_ON_TINY_PUBLISH
@@ -53,11 +54,18 @@ void LoadLoDTensor(model_parser::pb::LoDTensorDeserializer *loader,
 
 std::unique_ptr<framework::proto::ProgramDesc> LoadProgram(
     const std::string &path, const lite_api::CxxModelBuffer &model_buffer) {
+  
+  /// main_program 中保存了 paddle 的执行图
   std::unique_ptr<framework::proto::ProgramDesc> main_program(
       new framework::proto::ProgramDesc);
   if (model_buffer.is_empty()) {
     model_parser::BinaryFileReader file(path);
     main_program->ParseFromString(file.ReadToString(file.length()));
+    // std::string model_topo;
+    // google::protobuf::util::MessageToJsonString(
+    //                         *main_program, &model_topo);
+    // LOG(INFO) << "model topo";
+    // std::cout << model_topo << std::endl;
   } else {
     main_program->ParseFromString(model_buffer.get_program());
   }
@@ -185,8 +193,12 @@ void LoadNonCombinedParamsPb(const std::string &model_dir,
   // default format: non-combined params
   for (auto &var : main_block->GetVars()) {
     if (IsParamVarDesc(*var)) {
+
+      /// 优先加载 combined 的模型参数
       if (IsFileExists(model_dir + "/" + var->Name())) {
         VLOG(4) << "reading weight " << var->Name();
+
+        /// 读取指定的参数，所有的模型参数都必须是 LOD_TENSOR 类型
         model_parser::BinaryFileReader reader(model_dir + "/" + var->Name());
         model_parser::pb::LoDTensorDeserializer loader;
         switch (var->GetType()) {
@@ -233,6 +245,7 @@ void LoadModelPb(const std::string &model_dir,
   cpp_prog->ClearBlocks();
 
   // Load model topology data from file.
+  /// 需要从非 combined 的模型文件路径中获取模型的topo文件名称
   std::string prog_path =
       model_buffer.is_empty()
           ? FindModelFileName(model_dir, model_file, combined)
@@ -240,19 +253,25 @@ void LoadModelPb(const std::string &model_dir,
   if (model_buffer.is_empty()) {
     OPT_LOG << "Loading topology data from " << prog_path;
   }
+  /// 1. 从磁盘上加载模型的 topo 文件
   framework::proto::ProgramDesc pb_proto_prog =
       *LoadProgram(prog_path, model_buffer);
+  
+  /// 2. 将 ProgramDesc 转换为 cpp 的 ProgramDesc
   pb::ProgramDesc pb_prog(&pb_proto_prog);
   // Transform to cpp::ProgramDesc
   TransformProgramDescAnyToCpp(pb_prog, cpp_prog);
 
+  /// 3. 加载模型参数
   // Load params data from file.
   // NOTE: Only main block be used now.
   CHECK(combined || model_buffer.is_empty())
       << "If you want use the model_from_memory,"
       << " you should load the combined model using cfg.set_model_buffer "
          "interface.";
+  
   if (!combined) {
+    /// 3.1 加载非 combined 的模型
     LoadNonCombinedParamsPb(model_dir, cpp_prog, model_buffer, scope);
   } else {
     if (model_buffer.is_empty()) {
@@ -753,7 +772,6 @@ void LoadModelNaiveFromFile(const std::string &filename,
   uint16_t meta_version;
   reader.Read(&meta_version, sizeof(uint16_t));
   VLOG(4) << "Meta_version:" << meta_version;
-
   switch (meta_version) {
     case 0:
 #ifndef LITE_ON_TINY_PUBLISH

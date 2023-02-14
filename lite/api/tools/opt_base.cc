@@ -253,6 +253,7 @@ void OptBase::RecordModelInfo(bool record_strip_info) {
 }
 
 void OptBase::Run() {
+  ///1. 检测模型是否支持
   CheckIfModelSupported(false);
   OpKernelInfoCollector::Global().SetKernel2path(kernel2path_map);
   opt_config_.set_valid_places(valid_places_);
@@ -645,21 +646,25 @@ void OptBase::CheckIfModelSupported(bool print_ops_info) {
   }
 
   // 2.Load model into program to get ops in model
+  // 判断模型是否是combined模型
   bool is_combined_params_form = false;
   if (!(opt_config_.model_file()).empty() &&
       !(opt_config_.param_file()).empty()) {
     is_combined_params_form = true;
   }
+  // 加载模型的topo文件
   std::string prog_path = lite::FindModelFileName(opt_config_.model_dir(),
                                                   (opt_config_.model_file()),
                                                   is_combined_params_form);
 
+  // 根据模型的topo，将ProgramDesc转换为 cpp::ProgramDesc 格式
   lite::cpp::ProgramDesc cpp_prog;
   framework::proto::ProgramDesc pb_proto_prog = *lite::LoadProgram(prog_path);
   lite::pb::ProgramDesc pb_prog(&pb_proto_prog);
   // Transform to cpp::ProgramDesc
   lite::TransformProgramDescAnyToCpp(pb_prog, &cpp_prog);
 
+  // 判断该模型的 op 对于特定的设备是否支持
   std::set<std::string> unsupported_ops;
   std::set<std::string> input_model_ops;
   for (size_t index = 0; index < cpp_prog.BlocksSize(); index++) {
@@ -691,6 +696,7 @@ void OptBase::CheckIfModelSupported(bool print_ops_info) {
                                            valid_targets_set.end());
     PrintOpsInfo(input_model_ops, valid_targets);
   }
+  // 如果有不支持的 op 那么将进行输出
   if (!unsupported_ops.empty()) {
     std::string unsupported_ops_str = *unsupported_ops.begin();
     for (auto op_str = ++unsupported_ops.begin();

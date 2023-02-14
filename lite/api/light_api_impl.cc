@@ -165,14 +165,15 @@ bool LightPredictorImpl::TryShrinkMemory() {
 
 }  // namespace lite
 
+#include <iostream>
 namespace lite_api {
 
 template <>
 std::shared_ptr<PaddlePredictor> CreatePaddlePredictor(
     const MobileConfig& config) {
-  auto x = std::make_shared<lite::LightPredictorImpl>();
-  x->Init(config);
-  return x;
+    auto x = std::make_shared<lite::LightPredictorImpl>();
+    x->Init(config);
+    return x;
 }
 
 }  // namespace lite_api

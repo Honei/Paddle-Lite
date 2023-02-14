@@ -51,8 +51,10 @@ struct Program {
       : scope_(root_scope), valid_places_(valid_places) {
     CHECK(scope_) << "scope should be init first";
     VLOG(4) << "prepare work";
+    LOG(INFO) << "prepare work";
     PrepareWorkspace(program_desc, var_names);
     VLOG(4) << "build desc";
+    LOG(INFO) << "build desc";
     Build(program_desc);
     VLOG(4) << "build desc finished";
   }

@@ -377,7 +377,7 @@ class CxxPaddleApiImpl : public lite_api::PaddlePredictor {
   std::shared_ptr<Predictor> raw_predictor_;
   lite_api::CxxConfig config_;
   std::mutex mutex_;
-  bool status_is_cloned_;
+  bool status_is_cloned_;   
 };
 
 /*

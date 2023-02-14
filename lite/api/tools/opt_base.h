@@ -110,7 +110,7 @@ class LITE_API OptBase {
 
  private:
   bool enable_fp16_{false};
-  CxxConfig opt_config_;
+  CxxConfig opt_config_;    /// 读取配置参数
   // valid places for the optimized_model
   std::vector<Place> valid_places_;
   // filename of the optimized_model

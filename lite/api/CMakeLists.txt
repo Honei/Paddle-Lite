@@ -193,6 +193,19 @@ if(NOT IOS AND NOT LITE_ON_TINY_PUBLISH)
         DEPS gflags
         CV_DEPS paddle_cv_arm)
 
+    lite_cc_binary(model_to_text SRCS tools/model_to_text.cc 
+        DEPS gflags
+        CV_DEPS paddle_cv_arm)
+
+    lite_cc_binary(opt SRCS tools/opt.cc tools/opt_base.cc
+        DEPS gflags)
+    if (EMSCRIPTEN)
+        target_link_libraries(opt protobuf)
+        set_target_properties(opt PROPERTIES LINK_FLAGS "-s INITIAL_MEMORY=1000MB -s ALLOW_MEMORY_GROWTH=1 -sASSERTIONS")
+        if (WITH_NODE_RAW_FS)
+            set_target_properties(opt PROPERTIES LINK_FLAGS "-s NODERAWFS=1")
+        endif()
+    endif()
     # benchmark_bin
     add_subdirectory(tools/benchmark)
 endif()

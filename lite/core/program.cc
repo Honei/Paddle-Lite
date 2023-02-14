@@ -638,15 +638,20 @@ void Program::Build(const std::shared_ptr<cpp::ProgramDesc>& program_desc) {
 
   // Create operators.
   auto block_size = program_desc->BlocksSize();
+  LOG(INFO) << "block size: " << block_size;
   CHECK(block_size);
   ops_.resize(block_size);
   for (size_t block_idx = 0; block_idx < block_size; ++block_idx) {
     auto* block_desc = program_desc->GetBlock<cpp::BlockDesc>(block_idx);
     auto op_size = block_desc->OpsSize();
+    // block 里面有多个op
+    LOG(INFO) << "op size: " << op_size;
     for (size_t op_idx = 0; op_idx < op_size; ++op_idx) {
       auto* op_desc = block_desc->GetOp<cpp::OpDesc>(op_idx);
       auto op_type = op_desc->Type();
+      LOG(INFO) << "op type: " << op_type;
       VLOG(4) << "create Op [" << op_type << "]";
+      LOG(INFO) << "lite op list: " << LiteOpRegistry::Global().DebugString();
       auto op = LiteOpRegistry::Global().Create(op_type);
       CHECK(op) << "no Op found for " << op_type;
       if (op_type == "while") {
